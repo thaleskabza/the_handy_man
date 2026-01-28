@@ -1,0 +1,927 @@
+# The Handy Man - Project Constitution
+
+## Project Overview
+
+**Project Name:** The Handy Man  
+**Version:** 1.0.0  
+**Last Updated:** January 24, 2026  
+**Project Type:** Mobile-First On-Demand Service Platform  
+**Market:** South Africa (Initial Launch)
+
+### Vision Statement
+Create a lightweight, quick, mobile-first platform that connects clients with vetted artisanal professionals (plumbers, painters, carpenters, tilers, cleaners, electricians) for home services, inspired by the SweepSouth model but focused on skilled trades.
+
+### Success Criteria
+- Booking flow completion in under 2 minutes
+- 99.9% platform uptime
+- 4.5+ average customer satisfaction rating
+- Professional acceptance rate above 85%
+- Average professional response time under 5 minutes
+
+---
+
+## Business Model
+
+### Revenue Streams
+1. **Platform Fee:** 18-20% commission on each completed booking
+2. **Emergency Service Fee:** Additional R100 for urgent requests
+3. **Featured Professional Placement:** Premium visibility for professionals
+4. **Subscription Plans:** (Future) Monthly plans for frequent users
+
+### Target Users
+1. **Clients:** Homeowners, renters, property managers needing home services
+2. **Professionals:** Licensed/experienced artisans seeking more clients
+3. **Admins:** Platform operators managing quality and disputes
+
+### Key Differentiators
+- Mobile-first, lightweight design
+- < 2 minute booking process
+- Rigorous professional vetting (background checks, 2+ years experience)
+- Real-time tracking and communication
+- Multi-category ratings for quality assurance
+- Insurance coverage for bookings
+
+---
+
+## Technical Architecture
+
+### Technology Stack
+
+#### Frontend
+- **Mobile Apps:** React Native 0.73+ with TypeScript
+- **Web App:** Next.js 14+ with TypeScript, Tailwind CSS
+- **State Management:** Redux Toolkit / Zustand
+- **Navigation:** React Navigation 6
+- **UI Components:** React Native Paper / NativeBase
+- **Maps:** react-native-maps / Google Maps API
+- **Real-time:** Socket.io-client
+- **HTTP Client:** Axios with React Query
+
+#### Backend
+- **Runtime:** Node.js 20 LTS
+- **Framework:** Express.js / Fastify
+- **Language:** TypeScript
+- **API Style:** RESTful + WebSocket
+- **Documentation:** OpenAPI 3.0 (Swagger)
+- **Validation:** Zod
+- **ORM:** Prisma
+- **Authentication:** JWT + Passport.js
+- **Real-time:** Socket.io
+- **Background Jobs:** BullMQ (Redis-based)
+- **Testing:** Jest + Supertest
+
+#### Database
+- **Primary:** PostgreSQL 15+ (transactional data)
+  - Extensions: PostGIS (geospatial), pg_trgm (search)
+- **Cache/Queue:** Redis 7+ (sessions, caching, queues)
+- **NoSQL (Optional):** MongoDB 7+ (chat, logs)
+- **Search:** Elasticsearch 8+ / Meilisearch
+
+#### Infrastructure (AWS)
+- **Compute:** ECS/EC2 with Auto Scaling, Application Load Balancer
+- **Database:** RDS PostgreSQL (Multi-AZ), ElastiCache Redis
+- **Storage:** S3 (files), CloudFront (CDN)
+- **Containers:** Docker + ECS/Kubernetes
+- **CI/CD:** GitHub Actions
+- **Monitoring:** CloudWatch, Prometheus, Sentry
+- **Region:** af-south-1 (Cape Town) / eu-west-1 (Ireland)
+
+#### External Services
+- **Maps:** Google Maps API (geocoding, distance, directions)
+- **Payments:** Stripe / PayStack
+- **Push Notifications:** Firebase Cloud Messaging
+- **SMS:** Twilio
+- **Email:** SendGrid
+- **Background Checks:** Third-party API integration
+
+### System Architecture Pattern
+```
+Layered Architecture:
+1. Client Layer (Mobile/Web Apps)
+2. API Gateway Layer (Kong/AWS API Gateway)
+3. Application Layer (Microservices)
+   - Auth Service
+   - Main API Service
+   - WebSocket Service
+   - Booking Engine
+   - Matching Engine
+   - Payment Service
+   - Notification Service
+4. Data Layer (PostgreSQL, Redis, MongoDB, Elasticsearch)
+5. Storage & CDN Layer (S3, CloudFront)
+```
+
+---
+
+## Core Features & Requirements
+
+### 1. User Management
+
+#### Client Features
+- **Registration:** Email, phone, social login (Google, Facebook)
+- **Profile Management:** Name, photo, contact info, addresses
+- **Multiple Addresses:** Home, office, other with GPS coordinates
+- **Payment Methods:** Save multiple cards, mobile money
+- **Booking History:** View past and upcoming bookings
+- **Reviews Given:** Track ratings provided to professionals
+
+#### Professional Features
+- **Application Process:** Submit credentials, experience, references
+- **Profile:** Bio, photo, certifications, portfolio (10 photos max)
+- **Services Offered:** Select categories and specialties
+- **Availability Management:** Set weekly schedule, block dates
+- **Service Radius:** Define working area (default 20km)
+- **Earnings Dashboard:** Track income, jobs, performance metrics
+- **Bank Account:** Add verified account for withdrawals
+
+#### Admin Features
+- **Dashboard:** Platform metrics, revenue, user activity
+- **User Management:** Suspend/ban problematic users
+- **Professional Verification:** Approve/reject applications
+- **Dispute Resolution:** Handle reports and conflicts
+- **System Settings:** Configure platform parameters
+
+### 2. Service Categories
+
+**Core Services (MVP):**
+1. 🔧 **Plumbing** - Leak repairs, installations, drain cleaning
+2. 🎨 **Painting** - Interior/exterior painting, touch-ups
+3. 🪚 **Carpentry** - Furniture repair, installations, custom work
+4. 🧱 **Tiling** - Floor/wall tiling, tile repairs
+5. ⚡ **Electrical** - Wiring, fixture installation, repairs
+6. 🧹 **Cleaning** - House cleaning, deep cleaning
+7. 🔨 **General Repairs** - Handyman services, misc repairs
+
+**Service Attributes:**
+- Name, slug, description, icon
+- Base price, estimated duration
+- Number of active professionals
+- Average rating
+
+### 3. Booking Flow (< 2 Minutes Target)
+
+**Client Booking Process (7 Steps):**
+1. **Select Service Category** - Tap service icon on home screen
+2. **Choose Address** - Current location, saved address, or add new
+3. **Pick Date & Time** - Calendar with time slots (morning/afternoon/evening)
+4. **Describe Job** - Optional text (max 500 chars) + photos
+5. **View Available Professionals** - List with ratings, distance, price
+6. **Review Price Estimate** - Breakdown with platform fee
+7. **Confirm Booking** - Review details, select payment method, confirm
+
+**Professional Job Flow:**
+1. **Receive Notification** - Push notification with job details
+2. **View Job Details** - Service, location, time, client rating, earnings
+3. **Accept/Decline** - 15-minute response window
+4. **Job Added to Schedule** - Calendar view with all bookings
+5. **Start Job** - GPS verification when arriving at location
+6. **Complete Job** - Upload photos, adjust price if needed, submit
+7. **Receive Payment** - Funds added to available balance
+
+### 4. Professional Discovery & Matching
+
+**Search Algorithm:**
+- **Primary Factors:**
+  - Service category match
+  - Availability on requested date/time
+  - Within service radius (distance calculation)
+- **Ranking Factors:**
+  - Average rating (weighted 40%)
+  - Distance from client (weighted 30%)
+  - Response time (weighted 15%)
+  - Acceptance rate (weighted 10%)
+  - Number of completed jobs (weighted 5%)
+
+**Professional Profile Display:**
+- Profile photo, name, specialty
+- Overall rating (1-5 stars) with review count
+- Years of experience
+- Jobs completed count
+- Certifications and badges
+- Hourly rate or base price
+- Response time
+- Distance from client location
+- Sample reviews (3-5 most recent)
+
+### 5. Trust & Safety
+
+**Professional Vetting Process:**
+1. **Application Review:**
+   - Minimum 2 years experience required
+   - Valid ID/license verification
+   - Professional certifications
+   - Two references (contacted by phone)
+2. **Background Checks:**
+   - Criminal record check (automated API)
+   - ID verification
+   - Reference verification
+3. **Ongoing Monitoring:**
+   - Rating and review tracking
+   - Complaint monitoring
+   - Annual re-verification
+
+**Safety Features:**
+- ✅ All professionals background checked
+- ✅ Insurance coverage (R10,000 per booking)
+- ✅ In-app messaging (recorded)
+- ✅ GPS tracking during jobs
+- ✅ Emergency report button
+- ✅ 24-hour cancellation policy
+- ✅ Dispute resolution system
+
+### 6. Ratings & Reviews
+
+**Multi-Category Rating System:**
+- **Overall Rating:** 1-5 stars (required)
+- **Punctuality:** Did they arrive on time?
+- **Quality:** Was the work done well?
+- **Professionalism:** Were they courteous and professional?
+- **Value:** Was it worth the price?
+
+**Review Features:**
+- Written review (optional, max 500 chars)
+- Photo uploads (up to 5 photos)
+- "Would recommend" checkbox
+- Professional can respond to reviews
+- Reviews verified from actual bookings
+
+### 7. Communication
+
+**In-App Messaging:**
+- Real-time chat via WebSocket
+- Message types: text, image, location
+- Read receipts
+- Message history preserved
+- Push notifications for new messages
+- Professional can only message after job accepted
+
+**Direct Calling:**
+- Tap-to-call functionality
+- Optional number masking for privacy
+- Call logs tracked (for disputes)
+
+### 8. Payments & Pricing
+
+**Payment Flow:**
+1. Client books service → Price estimate shown
+2. Job completed → Professional can adjust price (with reason)
+3. Client approves final price
+4. Payment processed automatically
+5. Platform fee deducted (18%)
+6. Professional earnings added to balance
+7. Digital receipt sent to client
+
+**Payment Methods:**
+- Credit/Debit cards (Stripe)
+- Mobile money (PayStack/Flutterwave)
+- Cash on completion (limited)
+
+**Pricing Structure:**
+- Base rate (per hour or per job)
+- Platform fee: 18% of total
+- Emergency service: +R100
+- Tip option after service (100% to professional)
+
+**Professional Withdrawals:**
+- Minimum withdrawal: R500
+- Processing fee: R25
+- Transfer time: 1-3 business days
+- Weekly or instant payout options
+
+### 9. Real-Time Features
+
+**WebSocket Events:**
+- New job notifications (professional)
+- Booking status updates
+- Real-time messaging
+- Professional location tracking (during job)
+- Typing indicators
+- Online/offline status
+
+**Live Tracking:**
+- Professional location updated every 30 seconds
+- ETA calculation
+- Map view showing route
+- "Professional is on the way" notification
+- "Professional has arrived" notification
+
+### 10. Notifications
+
+**Client Notifications:**
+- Booking confirmed
+- Professional assigned
+- Professional accepted job
+- Reminder 24 hours before
+- Reminder 1 hour before
+- Professional is on the way (10 min)
+- Professional has arrived
+- Job started
+- Job completed
+- Reminder to rate and review
+
+**Professional Notifications:**
+- New job request (with 15-min timer)
+- Job cancelled by client
+- Reminder of upcoming job
+- Payment received
+- New message from client
+- New review received
+- Badge earned
+- Withdrawal processed
+
+**Delivery Methods:**
+- Push notifications (primary)
+- SMS (important updates)
+- Email (summaries, receipts)
+- User preferences configurable
+
+### 11. Admin Dashboard
+
+**Key Metrics:**
+- Total users (clients, professionals)
+- Active bookings today/week/month
+- Total revenue
+- Average booking value
+- Professional acceptance rate
+- Client satisfaction score (average rating)
+- Platform growth trends
+
+**Admin Functions:**
+- Approve/reject professional applications
+- Review background check results
+- Manage service categories
+- Handle disputes and reports
+- Issue refunds
+- Suspend/ban users
+- View detailed booking information
+- Generate reports
+- Configure system settings
+
+### 12. Performance Requirements
+
+**Speed:**
+- App load time: < 2 seconds
+- API response time: < 200ms (p95)
+- Search results: < 1 second
+- Booking flow completion: < 2 minutes
+- Image loading: Progressive (thumbnails first)
+
+**Scalability:**
+- Support 10,000+ concurrent users
+- Handle 100,000+ bookings per month
+- Database query optimization (indexes, caching)
+- Auto-scaling based on load
+
+**Reliability:**
+- 99.9% uptime SLA
+- Automated backups (daily full, hourly incremental)
+- Disaster recovery plan
+- Graceful degradation
+- Circuit breakers for external services
+
+**Mobile-First:**
+- Works on low-end devices
+- Optimized for 3G networks
+- App size < 20MB
+- Offline mode for viewing bookings
+- Progressive Web App (PWA) support
+
+---
+
+## Database Schema
+
+### Core Tables (25 Tables)
+
+1. **users** - Base table for all user types
+2. **clients** - Client-specific data
+3. **addresses** - Client service addresses
+4. **professionals** - Professional profiles and metrics
+5. **professional_availability** - Weekly schedules
+6. **professional_blocked_dates** - Unavailable dates
+7. **service_categories** - Service types
+8. **professional_services** - Professional-to-service mapping
+9. **bookings** - Core booking records
+10. **booking_status_history** - Audit trail
+11. **booking_photos** - Before/after photos
+12. **reviews** - Client reviews
+13. **review_photos** - Review attachments
+14. **messages** - In-app chat
+15. **payments** - Transaction records
+16. **payment_methods** - Saved payment methods
+17. **withdrawals** - Professional payouts
+18. **notifications** - All notifications
+19. **professional_applications** - Join requests
+20. **reports** - Disputes and issues
+21. **referral_codes** - Referral program
+22. **promo_codes** - Discount codes
+23. **promo_code_usage** - Promo tracking
+24. **professional_badges** - Achievements
+25. **system_settings** - Configuration
+
+### Key Relationships
+- users (1) ↔ (1) clients/professionals/admins
+- clients (1) ↔ (many) addresses
+- clients (1) ↔ (many) bookings
+- professionals (1) ↔ (many) bookings
+- professionals (1) ↔ (many) professional_services
+- bookings (1) ↔ (many) messages
+- bookings (1) ↔ (1) reviews
+- bookings (1) ↔ (1) payments
+
+### Database Indexes (Critical)
+- `idx_bookings_client_scheduled` on bookings(client_id, scheduled_date)
+- `idx_bookings_professional_status` on bookings(professional_id, booking_status)
+- `idx_professionals_location` on professionals(lat, lng) using GIST
+- `idx_reviews_professional_rating` on reviews(professional_id, overall_rating)
+- `idx_messages_booking_created` on messages(booking_id, created_at)
+
+---
+
+## API Specification
+
+### Base URL
+- **Production:** `https://api.thehandyman.com/v1`
+- **Staging:** `https://api-staging.thehandyman.com/v1`
+- **Development:** `http://localhost:3000/api/v1`
+
+### Authentication
+- **Type:** JWT (JSON Web Token)
+- **Header:** `Authorization: Bearer <token>`
+- **Token Expiry:** 1 hour (access), 30 days (refresh)
+
+### Core Endpoints (60+ Total)
+
+**Authentication (8 endpoints):**
+- `POST /auth/register/client` - Client registration
+- `POST /auth/register/professional` - Professional registration
+- `POST /auth/login` - Login
+- `POST /auth/social/google` - Google OAuth
+- `POST /auth/refresh` - Refresh token
+- `POST /auth/logout` - Logout
+- `GET /auth/me` - Get current user
+- `POST /auth/forgot-password` - Password reset
+
+**Service Categories (2 endpoints):**
+- `GET /service-categories` - List all categories
+- `GET /service-categories/{id}` - Get category details
+
+**Professionals (3 endpoints):**
+- `POST /professionals/search` - Search available professionals
+- `GET /professionals/{id}` - Get professional profile
+- `GET /professionals/{id}/reviews` - Get professional reviews
+
+**Bookings (11 endpoints):**
+- `POST /bookings` - Create booking
+- `GET /bookings` - Get my bookings
+- `GET /bookings/{id}` - Get booking details
+- `POST /bookings/{id}/cancel` - Cancel booking
+- `POST /bookings/{id}/reschedule` - Reschedule booking
+- `POST /bookings/{id}/start` - Start job (professional)
+- `POST /bookings/{id}/complete` - Complete job (professional)
+- `POST /bookings/{id}/accept` - Accept job (professional)
+- `POST /bookings/{id}/decline` - Decline job (professional)
+- `GET /bookings/{id}/messages` - Get booking messages
+- `POST /bookings/{id}/messages` - Send message
+
+**Reviews (3 endpoints):**
+- `POST /bookings/{id}/review` - Create review
+- `PATCH /reviews/{id}` - Update review
+- `POST /reviews/{id}/respond` - Professional response
+
+**Addresses (5 endpoints):**
+- `POST /addresses` - Create address
+- `GET /addresses` - Get my addresses
+- `PATCH /addresses/{id}` - Update address
+- `DELETE /addresses/{id}` - Delete address
+- `POST /addresses/{id}/set-default` - Set default
+
+**Payments (5 endpoints):**
+- `POST /payment-methods` - Add payment method
+- `GET /payment-methods` - Get payment methods
+- `DELETE /payment-methods/{id}` - Delete payment method
+- `POST /payments` - Process payment
+- `GET /payments` - Payment history
+
+**Professional Earnings (3 endpoints):**
+- `GET /professionals/me/earnings` - Earnings summary
+- `POST /withdrawals` - Request withdrawal
+- `GET /withdrawals` - Withdrawal history
+
+**Notifications (4 endpoints):**
+- `GET /notifications` - Get notifications
+- `POST /notifications/{id}/read` - Mark as read
+- `POST /notifications/read-all` - Mark all as read
+- `PATCH /users/me/notification-preferences` - Update preferences
+
+**Reports (3 endpoints):**
+- `POST /reports` - Create report
+- `GET /reports` - Get my reports
+- `GET /reports/{id}` - Get report details
+
+**Admin (10+ endpoints):**
+- `GET /admin/dashboard` - Dashboard stats
+- `GET /admin/applications` - Professional applications
+- `POST /admin/applications/{id}/approve` - Approve application
+- `POST /admin/applications/{id}/reject` - Reject application
+- `GET /admin/reports` - All reports/disputes
+- `POST /admin/reports/{id}/resolve` - Resolve dispute
+- `POST /admin/users/{id}/suspend` - Suspend user
+
+### Response Format
+```json
+{
+  "success": true,
+  "data": { ... },
+  "meta": {
+    "page": 1,
+    "per_page": 20,
+    "total": 100
+  }
+}
+```
+
+### Error Format
+```json
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid input data",
+    "details": [
+      {
+        "field": "email",
+        "message": "Invalid email format"
+      }
+    ]
+  }
+}
+```
+
+---
+
+## Security & Compliance
+
+### Security Measures
+1. **Authentication:**
+   - JWT tokens with RS256 algorithm
+   - Refresh token rotation
+   - Password hashing with bcrypt (cost factor 12)
+   - Two-factor authentication (optional)
+
+2. **Authorization:**
+   - Role-based access control (RBAC)
+   - Resource-level permissions
+   - API rate limiting (100 req/15min per user)
+
+3. **Data Protection:**
+   - Encryption at rest (AES-256)
+   - Encryption in transit (TLS 1.3)
+   - Sensitive data encryption (IDs, bank accounts)
+   - PII data anonymization
+
+4. **Input Validation:**
+   - Request schema validation (Zod)
+   - SQL injection prevention (ORM)
+   - XSS prevention (sanitization)
+   - CSRF protection
+   - File upload validation
+
+5. **Infrastructure:**
+   - VPC with private subnets
+   - Security groups (least privilege)
+   - WAF (Web Application Firewall)
+   - DDoS protection (CloudFlare)
+   - Regular security audits
+
+### Compliance
+- **POPIA (Protection of Personal Information Act):** South Africa
+- **GDPR (General Data Protection Regulation):** EU users
+- **PCI DSS:** Payment card industry compliance (via Stripe)
+
+### Data Retention
+- User accounts: Indefinite (unless deleted)
+- Bookings: 2 years active, then archived
+- Messages: 1 year
+- Notifications: 90 days
+- Payment records: 7 years (legal requirement)
+- Logs: 30 days active, 1 year archived
+
+---
+
+## Testing Strategy
+
+### Test Coverage Requirements
+- Unit Tests: > 80% coverage
+- Integration Tests: All API endpoints
+- End-to-End Tests: Critical user flows
+- Performance Tests: Load and stress testing
+
+### Test Levels
+1. **Unit Tests (Jest):**
+   - Individual functions
+   - Database models
+   - Utilities and helpers
+   - Business logic
+
+2. **Integration Tests (Supertest):**
+   - API endpoints
+   - Database operations
+   - External service mocks
+   - Authentication flows
+
+3. **End-to-End Tests (Detox/Cypress):**
+   - Complete booking flow
+   - User registration
+   - Payment processing
+   - Professional onboarding
+
+4. **Performance Tests (k6):**
+   - Load testing (1000 concurrent users)
+   - Stress testing (find breaking point)
+   - Spike testing (sudden traffic surge)
+   - Endurance testing (sustained load)
+
+### CI/CD Testing Pipeline
+```
+1. Lint code (ESLint)
+2. Run unit tests
+3. Run integration tests
+4. Build Docker image
+5. Scan for vulnerabilities
+6. Deploy to staging
+7. Run E2E tests
+8. Deploy to production (on main branch)
+```
+
+---
+
+## Deployment Strategy
+
+### Environments
+1. **Development:** Local machines
+2. **Staging:** `api-staging.thehandyman.com` (auto-deploy from develop branch)
+3. **Production:** `api.thehandyman.com` (manual approval from main branch)
+
+### Deployment Process
+1. **Blue-Green Deployment:**
+   - Deploy new version to "Green" environment
+   - Run health checks
+   - Route 10% traffic to Green (canary)
+   - Monitor metrics for 5 minutes
+   - Route 50% traffic if stable
+   - Monitor for 10 minutes
+   - Route 100% traffic if stable
+   - Keep Blue for 24 hours (rollback capability)
+
+2. **Database Migrations:**
+   - Backward-compatible migrations
+   - Run migrations before code deployment
+   - Test rollback procedures
+
+3. **Rollback Plan:**
+   - Automated rollback on failed health checks
+   - Manual rollback capability
+   - Database rollback scripts
+   - Communication plan
+
+### Monitoring
+- **Application:** Prometheus + Grafana
+- **Infrastructure:** AWS CloudWatch
+- **Errors:** Sentry
+- **Logs:** ELK Stack (Elasticsearch, Logstash, Kibana)
+- **Uptime:** Pingdom / UptimeRobot
+
+### Alerts
+- Error rate > 5%
+- Response time p95 > 500ms
+- Database CPU > 80%
+- Failed payments
+- Critical errors
+- Service downtime
+
+---
+
+## Development Guidelines
+
+### Code Style
+- **Language:** TypeScript (strict mode)
+- **Linter:** ESLint with Airbnb config
+- **Formatter:** Prettier
+- **Commit Convention:** Conventional Commits
+- **Branch Strategy:** Git Flow
+  - `main` - production
+  - `develop` - development
+  - `feature/*` - new features
+  - `bugfix/*` - bug fixes
+  - `hotfix/*` - production fixes
+
+### Commit Message Format
+```
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+```
+
+Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
+
+Example:
+```
+feat(booking): add real-time professional tracking
+
+- Implement WebSocket connection for location updates
+- Add map view with professional marker
+- Calculate ETA based on distance and traffic
+
+Closes #123
+```
+
+### Code Review Process
+1. Create pull request
+2. Automated checks (tests, lint)
+3. Minimum 1 approval required
+4. Address review comments
+5. Squash and merge
+
+### Documentation
+- API documentation (Swagger/OpenAPI)
+- Code comments (JSDoc)
+- README files for each service
+- Architecture decision records (ADRs)
+- User guides and tutorials
+
+---
+
+## Launch Plan
+
+### MVP Scope (Months 1-3)
+
+**Phase 1 - Core Platform (Weeks 1-8):**
+- User registration and authentication
+- 4 core services (Plumbing, Painting, Carpentry, Cleaning)
+- Basic booking flow
+- Professional profiles with ratings
+- Payment integration (Stripe)
+- Basic admin panel
+
+**Phase 2 - Trust & Quality (Weeks 9-12):**
+- Rating and review system
+- Professional verification process
+- In-app messaging
+- Booking management (cancel, reschedule)
+- Push notifications
+- Email notifications
+
+**Phase 3 - Scale & Optimize (Weeks 13-16):**
+- Advanced matching algorithm
+- GPS tracking
+- Analytics dashboard
+- Multiple payment methods
+- Referral program
+- Performance optimization
+
+### Post-MVP Features (Months 4-6)
+- Additional service categories (Electrical, Tiling, General Repairs)
+- Professional badges and achievements
+- Subscription plans for frequent users
+- Advanced search filters
+- Service packages and bundles
+- Mobile app optimizations
+- Marketing automation
+
+### Launch Checklist
+- [ ] All MVP features tested
+- [ ] Security audit completed
+- [ ] Performance testing passed
+- [ ] Legal documents prepared (Terms, Privacy)
+- [ ] Payment processing verified
+- [ ] Customer support ready
+- [ ] Marketing materials prepared
+- [ ] App store submissions approved
+- [ ] Monitoring and alerts configured
+- [ ] Backup and disaster recovery tested
+
+### Success Metrics (First 6 Months)
+- 1,000+ registered clients
+- 100+ verified professionals
+- 500+ completed bookings
+- 4.5+ average rating
+- < 2 minute average booking time
+- 90%+ professional acceptance rate
+- 80%+ client retention rate
+
+---
+
+## Team Structure
+
+### Development Team (MVP)
+- **1 Full-Stack Lead** - Architecture, backend, DevOps
+- **2 Frontend Developers** - React Native, Next.js
+- **1 Backend Developer** - Node.js, APIs, databases
+- **1 UI/UX Designer** - Mobile design, user flows
+- **1 QA Engineer** - Testing, automation
+- **1 Product Manager** - Requirements, priorities, stakeholders
+
+### Operations Team
+- **1 Customer Support Lead** - Handle inquiries, disputes
+- **2 Support Agents** - Client and professional support
+- **1 Operations Manager** - Professional onboarding, quality
+
+---
+
+## Risk Management
+
+### Technical Risks
+| Risk | Impact | Probability | Mitigation |
+|------|--------|-------------|------------|
+| Payment gateway downtime | High | Low | Backup payment provider, queue transactions |
+| Database failure | Critical | Low | Multi-AZ deployment, automated backups |
+| API rate limiting | Medium | Medium | Implement caching, optimize queries |
+| Third-party API failures | Medium | Medium | Circuit breakers, fallback mechanisms |
+| Security breach | Critical | Low | Regular audits, penetration testing |
+
+### Business Risks
+| Risk | Impact | Probability | Mitigation |
+|------|--------|-------------|------------|
+| Low professional adoption | High | Medium | Referral incentives, competitive rates |
+| Client trust issues | High | Low | Rigorous vetting, insurance, reviews |
+| Regulatory changes | Medium | Low | Legal counsel, compliance monitoring |
+| Competition | Medium | High | Focus on quality, user experience |
+| Seasonal demand fluctuations | Low | High | Diversify services, flexible pricing |
+
+---
+
+## Support & Maintenance
+
+### Support Channels
+- **In-App Chat:** Real-time support (7am-7pm daily)
+- **Email:** support@thehandyman.com (24-hour response)
+- **Phone:** +27 XXX XXXX (business hours)
+- **Help Center:** FAQ, tutorials, troubleshooting
+
+### Support SLAs
+- **Critical Issues:** Response within 1 hour
+- **High Priority:** Response within 4 hours
+- **Medium Priority:** Response within 24 hours
+- **Low Priority:** Response within 48 hours
+
+### Maintenance Windows
+- **Scheduled Maintenance:** Sundays 2am-4am CAT
+- **Emergency Maintenance:** As needed with notice
+- **Database Backups:** Daily at 2am
+- **System Updates:** Monthly security patches
+
+---
+
+## Glossary
+
+**Artisan:** Skilled professional in a trade (plumber, carpenter, etc.)  
+**Booking:** Service request from client to professional  
+**Client:** User who books services  
+**Professional:** Verified artisan offering services  
+**Service Category:** Type of service (Plumbing, Painting, etc.)  
+**Platform Fee:** Commission charged on bookings (18%)  
+**Acceptance Rate:** Percentage of jobs accepted by professional  
+**Response Time:** Average time for professional to respond to job requests  
+**Booking Reference:** Unique identifier for booking (e.g., HM-2026-001234)  
+**MVP:** Minimum Viable Product  
+**SLA:** Service Level Agreement  
+**ETA:** Estimated Time of Arrival  
+**P95:** 95th percentile (performance metric)  
+**RBAC:** Role-Based Access Control  
+**JWT:** JSON Web Token  
+**CDN:** Content Delivery Network  
+**PWA:** Progressive Web App  
+
+---
+
+## Appendices
+
+### A. Reference Documents
+1. User Stories (01_USER_STORIES.md)
+2. Database Schema (02_DATABASE_SCHEMA.md)
+3. Wireframes & User Flows (03_WIREFRAMES_USER_FLOWS.md)
+4. Technical Architecture & API (04_TECHNICAL_ARCHITECTURE_API.md)
+
+### B. External References
+- SweepSouth Platform: https://sweepsouth.com/
+- React Native Docs: https://reactnative.dev/
+- Stripe API: https://stripe.com/docs/api
+- Google Maps API: https://developers.google.com/maps
+- PostgreSQL Docs: https://www.postgresql.org/docs/
+
+### C. Change Log
+| Date | Version | Changes | Author |
+|------|---------|---------|--------|
+| 2026-01-24 | 1.0.0 | Initial constitution created | System |
+
+---
+
+**Document Status:** ✅ APPROVED  
+**Last Review:** January 24, 2026  
+**Next Review:** February 24, 2026
+
+---
+
+*This constitution serves as the single source of truth for The Handy Man project. All development, design, and business decisions should align with the specifications outlined in this document.*
