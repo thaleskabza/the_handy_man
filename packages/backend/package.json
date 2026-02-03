@@ -1,0 +1,28 @@
+{
+  "name": "@handy-man/backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "build": "bun build src/index.ts --outdir=dist --target=bun",
+    "start": "bun run dist/index.js",
+    "test": "bun test",
+    "test:watch": "bun test --watch"
+  },
+  "dependencies": {
+    "@handy-man/shared": "workspace:*",
+    "@prisma/client": "^5.22.0",
+    "bcryptjs": "^2.4.3",
+    "hono": "^4.4.0",
+    "ioredis": "^5.4.0",
+    "jose": "^5.6.0",
+    "resend": "^3.4.0",
+    "twilio": "^5.2.0"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/bun": "latest",
+    "prisma": "^5.22.0"
+  }
+}
