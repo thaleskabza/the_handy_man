@@ -1,0 +1,97 @@
+// Prisma Schema for Handy Man
+// https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+
+enum RegistrationMethod {
+  EMAIL_PASSWORD
+  PHONE
+  GOOGLE
+  FACEBOOK
+}
+
+enum UserRole {
+  CLIENT
+  HANDYMAN
+  ADMIN
+}
+
+// Models
+
+model User {
+  id                       String              @id @default(cuid())
+  email                    String?             @unique
+  phone                    String?             @unique
+  passwordHash             String?             @map("password_hash")
+  firstName                String              @map("first_name")
+  lastName                 String              @map("last_name")
+  role                     UserRole            @default(CLIENT)
+  registrationMethod       RegistrationMethod  @map("registration_method")
+
+  // Email verification
+  isEmailVerified          Boolean             @default(false) @map("is_email_verified")
+  emailVerifiedAt          DateTime?           @map("email_verified_at")
+  emailVerificationToken   String?             @map("email_verification_token")
+  emailVerificationExpiry  DateTime?           @map("email_verification_expiry")
+
+  // Phone verification
+  isPhoneVerified          Boolean             @default(false) @map("is_phone_verified")
+  phoneVerifiedAt          DateTime?           @map("phone_verified_at")
+
+  // Consent tracking
+  acceptedTermsAt          DateTime            @map("accepted_terms_at")
+  acceptedPrivacyAt        DateTime            @map("accepted_privacy_at")
+  marketingOptIn           Boolean             @default(false) @map("marketing_opt_in")
+
+  // Timestamps
+  createdAt                DateTime            @default(now()) @map("created_at")
+  updatedAt                DateTime            @updatedAt @map("updated_at")
+
+  // Relations
+  socialConnections        SocialConnection[]
+  refreshTokens            RefreshToken[]
+
+  @@map("users")
+}
+
+model SocialConnection {
+  id              String   @id @default(cuid())
+  userId          String   @map("user_id")
+  provider        String   // google, facebook
+  providerUserId  String   @map("provider_user_id")
+  providerEmail   String?  @map("provider_email")
+  accessToken     String?  @map("access_token")
+  refreshToken    String?  @map("refresh_token")
+  expiresAt       DateTime? @map("expires_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+  @@map("social_connections")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@map("refresh_tokens")
+}
