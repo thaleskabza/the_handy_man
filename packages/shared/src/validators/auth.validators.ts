@@ -78,6 +78,37 @@ export const resendSmsSchema = z.object({
   phone: phoneSchema,
 })
 
+// Login schema
+export const loginSchema = z.object({
+  email: emailSchema.optional(),
+  phone: phoneSchema.optional(),
+  password: z.string().min(1, 'Password is required'),
+}).refine((data: { email?: string; phone?: string }) => data.email || data.phone, {
+  message: 'Email or phone number is required',
+  path: ['email'],
+})
+
+// Refresh token schema
+export const refreshTokenSchema = z.object({
+  refreshToken: z.string().min(1, 'Refresh token is required'),
+})
+
+// Logout schema
+export const logoutSchema = z.object({
+  refreshToken: z.string().min(1, 'Refresh token is required'),
+})
+
+// Forgot password schema
+export const forgotPasswordSchema = z.object({
+  email: emailSchema,
+})
+
+// Reset password schema
+export const resetPasswordSchema = z.object({
+  token: z.string().min(1, 'Reset token is required'),
+  password: passwordSchema,
+})
+
 // Type exports
 export type SignupEmailInput = z.infer<typeof signupEmailSchema>
 export type SignupPhoneInput = z.infer<typeof signupPhoneSchema>
@@ -85,3 +116,8 @@ export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>
 export type VerifySmsInput = z.infer<typeof verifySmsSchema>
 export type ResendEmailInput = z.infer<typeof resendEmailSchema>
 export type ResendSmsInput = z.infer<typeof resendSmsSchema>
+export type LoginInput = z.infer<typeof loginSchema>
+export type RefreshTokenInput = z.infer<typeof refreshTokenSchema>
+export type LogoutInput = z.infer<typeof logoutSchema>
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>

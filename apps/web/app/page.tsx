@@ -10,10 +10,16 @@ export default function Home() {
         <p className="text-lg text-gray-600 mb-8">
           Find trusted handymen in your area for all your home repair needs.
         </p>
-        <div className="flex gap-4 justify-center">
+        <div className="flex gap-4 justify-center flex-wrap">
+          <Link
+            href="/services"
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+          >
+            Browse Services
+          </Link>
           <Link
             href="/auth/signup"
-            className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+            className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
           >
             Get Started
           </Link>

@@ -1,0 +1,23 @@
+{
+  "health": "/health",
+  "auth": {
+    "signupEmail": "/auth/signup/email",
+    "signupPhone": "/auth/signup/phone",
+    "verifyEmail": "/auth/verify/email",
+    "verifySms": "/auth/verify/sms",
+    "login": "/auth/login",
+    "refresh": "/auth/refresh",
+    "logout": "/auth/logout",
+    "forgotPassword": "/auth/forgot-password",
+    "resetPassword": "/auth/reset-password",
+    "resend": "/auth/resend",
+    "me": "/auth/me"
+  },
+  "serviceCategories": "/service-categories",
+  "professionals": "/professionals",
+  "bookings": {
+    "list": "/bookings",
+    "create": "/bookings",
+    "addresses": "/bookings/addresses"
+  }
+}

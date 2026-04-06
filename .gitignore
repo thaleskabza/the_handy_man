@@ -34,8 +34,14 @@ prisma/migrations/**/migration.sql
 
 # Testing
 coverage/
+tests/reports/
+test-results/
+playwright-report/
 
 # Temporary
 *.tmp
 *.temp
 .cache/
+
+.claude/*
+.specify/*
