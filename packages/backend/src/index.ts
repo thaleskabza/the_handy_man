@@ -32,6 +32,9 @@ import bookingsRoute from './api/bookings/bookings.route'
 // Reviews
 import reviewsRoute from './api/reviews/reviews.route'
 
+// Admin
+import adminRoute from './api/admin/admin.route'
+
 // Test helpers (non-production only)
 import testRoute from './api/test/test.route'
 
@@ -71,6 +74,7 @@ app.route('/service-categories', serviceCategoriesRoute)
 app.route('/professionals', professionalsRoute)
 app.route('/bookings', bookingsRoute)
 app.route('/reviews', reviewsRoute)
+app.route('/admin', adminRoute)
 app.route('/test', testRoute)
 
 // 404 handler

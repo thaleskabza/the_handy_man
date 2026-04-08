@@ -34,12 +34,18 @@ import {
   addBlockedDate,
   removeBlockedDate,
   searchProfessionals,
+  submitApplication,
+  getMyApplication,
 } from '../../services/professionals/professional.service'
+import {
+  submitApplicationSchema,
+} from '@handy-man/shared/validators'
 import type {
   UpdateProfessionalProfileInput,
   SetProfessionalServicesInput,
   SetAvailabilityInput,
   BlockDateInput,
+  SubmitApplicationInput,
 } from '@handy-man/shared/validators'
 
 const router = new Hono()
@@ -210,6 +216,36 @@ router.post(
     return c.json({ success: true, blocked: result.blocked }, HTTP_STATUS.CREATED)
   }
 )
+
+// POST /professionals/me/apply — submit verification application
+router.post(
+  '/me/apply',
+  authenticate,
+  requireRole('HANDYMAN'),
+  validateRequest(submitApplicationSchema),
+  async (c) => {
+    const userId = c.get('userId')
+    const input = c.get('validated') as SubmitApplicationInput
+    const result = await submitApplication(userId, input)
+
+    if (!result.success) {
+      const status = result.code === 'DUPLICATE' ? HTTP_STATUS.CONFLICT : HTTP_STATUS.NOT_FOUND
+      return c.json({ success: false, error: result.error, code: result.code }, status)
+    }
+
+    return c.json({ success: true, application: result.application }, HTTP_STATUS.CREATED)
+  }
+)
+
+// GET /professionals/me/apply — get own application status
+router.get('/me/apply', authenticate, requireRole('HANDYMAN'), async (c) => {
+  const userId = c.get('userId')
+  const result = await getMyApplication(userId)
+  if (!result.success) {
+    return c.json({ success: false, error: result.error, code: result.code }, HTTP_STATUS.NOT_FOUND)
+  }
+  return c.json({ success: true, application: result.application })
+})
 
 router.delete('/me/blocked-dates/:dateId', authenticate, requireRole('HANDYMAN'), async (c) => {
   const userId = c.get('userId')

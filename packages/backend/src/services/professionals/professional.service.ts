@@ -10,6 +10,8 @@ import type {
   SetAvailabilityInput,
   BlockDateInput,
   ProfessionalSearchInput,
+  SubmitApplicationInput,
+  ReviewApplicationInput,
 } from '@handy-man/shared/validators'
 
 // ── Profile ───────────────────────────────────────────────────────────────────
@@ -158,6 +160,104 @@ export async function removeBlockedDate(professionalId: string, blockedDateId: s
 
   await prisma.professionalBlockedDate.delete({ where: { id: blockedDateId } })
   return { success: true }
+}
+
+// ── Application / Verification ────────────────────────────────────────────────
+
+export async function submitApplication(userId: string, input: SubmitApplicationInput) {
+  const professional = await prisma.professional.findUnique({ where: { userId } })
+  if (!professional) return { success: false, error: 'Professional profile not found', code: 'NOT_FOUND' }
+
+  // Only one pending/under-review application at a time
+  const existing = await prisma.application.findFirst({
+    where: { professionalId: professional.id, status: { in: ['PENDING', 'UNDER_REVIEW'] } },
+  })
+  if (existing) {
+    return { success: false, error: 'You already have a pending application', code: 'DUPLICATE' }
+  }
+
+  const application = await prisma.application.create({
+    data: {
+      professionalId: professional.id,
+      yearsExperience: input.yearsExperience,
+      selectedCategories: input.selectedCategories,
+      idDocumentUrl: input.idDocumentUrl,
+      certificationsUrls: input.certificationsUrls ?? [],
+      referencesUrls: input.referencesUrls ?? [],
+      agreedToBackgroundCheck: input.agreedToBackgroundCheck,
+    },
+  })
+
+  return { success: true, application }
+}
+
+export async function getMyApplication(userId: string) {
+  const professional = await prisma.professional.findUnique({ where: { userId } })
+  if (!professional) return { success: false, error: 'Professional profile not found', code: 'NOT_FOUND' }
+
+  const application = await prisma.application.findFirst({
+    where: { professionalId: professional.id },
+    orderBy: { createdAt: 'desc' },
+  })
+
+  return { success: true, application }
+}
+
+// ── Admin ─────────────────────────────────────────────────────────────────────
+
+export async function listApplications(status?: string) {
+  const where = status ? { status: status as 'PENDING' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED' } : {}
+
+  const applications = await prisma.application.findMany({
+    where,
+    orderBy: { createdAt: 'asc' },
+    include: {
+      professional: {
+        include: {
+          user: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } },
+        },
+      },
+    },
+  })
+
+  return { success: true, applications }
+}
+
+export async function reviewApplication(
+  applicationId: string,
+  adminUserId: string,
+  input: ReviewApplicationInput
+) {
+  const application = await prisma.application.findUnique({
+    where: { id: applicationId },
+    include: { professional: true },
+  })
+
+  if (!application) return { success: false, error: 'Application not found', code: 'NOT_FOUND' }
+  if (application.status === 'APPROVED' || application.status === 'REJECTED') {
+    return { success: false, error: 'Application already reviewed', code: 'INVALID_STATUS' }
+  }
+
+  const updated = await prisma.application.update({
+    where: { id: applicationId },
+    data: {
+      status: input.status,
+      adminNotes: input.adminNotes,
+      rejectionReason: input.rejectionReason,
+      reviewedByAdminId: adminUserId,
+      reviewedAt: new Date(),
+    },
+  })
+
+  // On approval, mark professional as verified
+  if (input.status === 'APPROVED') {
+    await prisma.professional.update({
+      where: { id: application.professionalId },
+      data: { isVerified: true, verificationDate: new Date() },
+    })
+  }
+
+  return { success: true, application: updated }
 }
 
 // ── Search / Listing ──────────────────────────────────────────────────────────
