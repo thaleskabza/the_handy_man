@@ -7,6 +7,7 @@ import { signupEmailSchema, type SignupEmailInput } from '@handy-man/shared/vali
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import Link from 'next/link'
+import { apiFetch } from '@/lib/auth'
 
 export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false)
@@ -30,9 +31,8 @@ export default function SignupPage() {
     setMessage(null)
 
     try {
-      const response = await fetch('http://localhost:3000/auth/signup/email', {
+      const response = await apiFetch('/auth/signup/email', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       })
 
@@ -43,7 +43,7 @@ export default function SignupPage() {
       } else {
         setMessage({ type: 'error', text: result.error || 'Registration failed' })
       }
-    } catch (error) {
+    } catch {
       setMessage({ type: 'error', text: 'Network error. Please try again.' })
     } finally {
       setIsLoading(false)
