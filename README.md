@@ -140,7 +140,7 @@ bun run build            # Build all packages
 See `packages/backend/.env.example` for all required environment variables.
 
 Key variables:
-- `DATABASE_URL` - PostgreSQL connection string
+- `DATABASE_HANDYMAN_URL` - PostgreSQL connection string
 - `REDIS_URL` - Redis connection string
 - `JWT_SECRET` - JWT signing secret
 - `STRIPE_SECRET_KEY` - Stripe API key
