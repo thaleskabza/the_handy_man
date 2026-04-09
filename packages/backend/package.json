@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@handy-man/shared": "workspace:*",
+    "@hono/swagger-ui": "^0.6.1",
     "@prisma/client": "^5.22.0",
     "@supabase/supabase-js": "^2.102.1",
     "bcryptjs": "^2.4.3",

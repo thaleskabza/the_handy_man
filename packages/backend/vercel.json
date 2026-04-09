@@ -1,0 +1,6 @@
+{
+  "buildCommand": "echo 'No build needed — Vercel compiles api/index.ts automatically'",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/api" }
+  ]
+}

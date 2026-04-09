@@ -51,6 +51,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@handy-man/shared": "workspace:*",
+        "@hono/swagger-ui": "^0.6.1",
         "@prisma/client": "^5.22.0",
         "@supabase/supabase-js": "^2.102.1",
         "bcryptjs": "^2.4.3",
@@ -128,6 +129,8 @@
     "@handy-man/shared": ["@handy-man/shared@workspace:packages/shared"],
 
     "@handy-man/web": ["@handy-man/web@workspace:apps/web"],
+
+    "@hono/swagger-ui": ["@hono/swagger-ui@0.6.1", "", { "peerDependencies": { "hono": ">=4.0.0" } }, "sha512-sJTvldu1GPeEPfyeLG7gRj+W4vEuD+JDi+JjJ3TJs/DvMUtBLs0KJO5yokGegWWdy5qrbdnQGekbhgNRmPmYKQ=="],
 
     "@hookform/resolvers": ["@hookform/resolvers@3.10.0", "", { "peerDependencies": { "react-hook-form": "^7.0.0" } }, "sha512-79Dv+3mDF7i+2ajj7SkypSKHhl1cbln1OGavqrsF7p6mbUv11xpqpacPsGDCTRvCSjEEIez2ef1NveSVL3b0Ag=="],
 
