@@ -9,6 +9,7 @@ import { HTTP_STATUS } from '@handy-man/shared/constants'
 import { validateRequest } from '../../middleware/validation.middleware'
 import { signupRateLimiter } from '../../middleware/rate-limit.middleware'
 import { signupWithPhone } from '../../services/auth/signup.service'
+import type { SignupPhoneInput } from '@handy-man/shared/validators'
 
 const router = new Hono()
 
@@ -17,7 +18,7 @@ router.post(
   signupRateLimiter,
   validateRequest(signupPhoneSchema),
   async (c) => {
-    const validated = c.get('validated')
+    const validated = c.get('validated') as SignupPhoneInput
 
     const result = await signupWithPhone(validated)
 

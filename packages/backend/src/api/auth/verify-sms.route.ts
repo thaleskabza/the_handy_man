@@ -17,7 +17,7 @@ router.post(
   verificationRateLimiter,
   validateRequest(verifySmsSchema),
   async (c) => {
-    const { phone, code } = c.get('validated')
+    const { phone, code } = c.get('validated') as import('@handy-man/shared/validators').VerifySmsInput
 
     const result = await verifySms(phone, code)
 

@@ -17,7 +17,7 @@ router.post(
   verificationRateLimiter,
   validateRequest(verifyEmailSchema),
   async (c) => {
-    const { token } = c.get('validated')
+    const { token } = c.get('validated') as import('@handy-man/shared/validators').VerifyEmailInput
 
     const result = await verifyEmail(token)
 

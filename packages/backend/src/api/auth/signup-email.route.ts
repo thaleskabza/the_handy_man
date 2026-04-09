@@ -9,6 +9,7 @@ import { HTTP_STATUS } from '@handy-man/shared/constants'
 import { validateRequest } from '../../middleware/validation.middleware'
 import { signupRateLimiter } from '../../middleware/rate-limit.middleware'
 import { signupWithEmail } from '../../services/auth/signup.service'
+import type { SignupEmailInput } from '@handy-man/shared/validators'
 
 const router = new Hono()
 
@@ -17,7 +18,7 @@ router.post(
   signupRateLimiter,
   validateRequest(signupEmailSchema),
   async (c) => {
-    const validated = c.get('validated')
+    const validated = c.get('validated') as SignupEmailInput
 
     const result = await signupWithEmail(validated)
 
