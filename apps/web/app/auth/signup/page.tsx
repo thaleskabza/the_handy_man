@@ -20,8 +20,8 @@ export default function SignupPage() {
   } = useForm<SignupEmailInput>({
     resolver: zodResolver(signupEmailSchema),
     defaultValues: {
-      acceptedTerms: false,
-      acceptedPrivacy: false,
+      acceptedTerms: undefined,
+      acceptedPrivacy: undefined,
       marketingOptIn: false,
     },
   })

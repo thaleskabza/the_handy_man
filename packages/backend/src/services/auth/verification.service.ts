@@ -1,10 +1,8 @@
 /**
  * Verification Service
- * Handles email and phone verification
  */
 
-import { prisma } from '../../lib/prisma/client'
-import { getRedisClient } from '../../lib/redis/client'
+import { supabase } from '../../lib/supabase/client'
 import { generateAccessToken, generateRefreshToken } from './token.service'
 
 interface VerificationResult {
@@ -16,89 +14,65 @@ interface VerificationResult {
 }
 
 export async function verifyEmail(token: string): Promise<VerificationResult> {
-  // Find user with this verification token
-  const user = await prisma.user.findFirst({
-    where: {
-      emailVerificationToken: token,
-      emailVerificationExpiry: { gt: new Date() },
-    },
-  })
+  const { data: user } = await supabase
+    .from('users')
+    .select('id, email, phone, email_verification_expiry')
+    .eq('email_verification_token', token)
+    .maybeSingle()
 
-  if (!user) {
+  if (!user || new Date(user.email_verification_expiry) < new Date()) {
     return { success: false, error: 'Invalid or expired token', code: 'INVALID_TOKEN' }
   }
 
-  // Mark email as verified
-  await prisma.user.update({
-    where: { id: user.id },
-    data: {
-      isEmailVerified: true,
-      emailVerifiedAt: new Date(),
-      emailVerificationToken: null,
-      emailVerificationExpiry: null,
-    },
-  })
+  await supabase
+    .from('users')
+    .update({
+      is_email_verified: true,
+      email_verified_at: new Date().toISOString(),
+      email_verification_token: null,
+      email_verification_expiry: null,
+    })
+    .eq('id', user.id)
 
-  // Generate tokens
-  const accessToken = await generateAccessToken({
-    userId: user.id,
-    email: user.email!,
-  })
-
-  const refreshToken = await generateRefreshToken({
-    userId: user.id,
-    email: user.email!,
-  })
+  const accessToken = await generateAccessToken({ userId: user.id, email: user.email })
+  const refreshToken = await generateRefreshToken({ userId: user.id, email: user.email })
 
   return { success: true, accessToken, refreshToken }
 }
 
 export async function verifySms(phone: string, code: string): Promise<VerificationResult> {
   const normalizedPhone = phone.replace(/\s/g, '')
-  const redis = getRedisClient()
 
-  // Get stored code from Redis
-  const storedCode = await redis.get(`phone_verify:${normalizedPhone}`)
+  const { data: user } = await supabase
+    .from('users')
+    .select('id, phone, phone_verification_code, phone_verification_expiry')
+    .eq('phone', normalizedPhone)
+    .maybeSingle()
 
-  if (!storedCode) {
+  if (!user || !user.phone_verification_code || !user.phone_verification_expiry) {
     return { success: false, error: 'Code expired', code: 'CODE_EXPIRED' }
   }
 
-  if (storedCode !== code) {
+  if (new Date(user.phone_verification_expiry) < new Date()) {
+    return { success: false, error: 'Code expired', code: 'CODE_EXPIRED' }
+  }
+
+  if (user.phone_verification_code !== code) {
     return { success: false, error: 'Invalid code', code: 'INVALID_CODE' }
   }
 
-  // Find user
-  const user = await prisma.user.findUnique({
-    where: { phone: normalizedPhone },
-  })
+  await supabase
+    .from('users')
+    .update({
+      is_phone_verified: true,
+      phone_verified_at: new Date().toISOString(),
+      phone_verification_code: null,
+      phone_verification_expiry: null,
+    })
+    .eq('id', user.id)
 
-  if (!user) {
-    return { success: false, error: 'User not found', code: 'USER_NOT_FOUND' }
-  }
-
-  // Mark phone as verified
-  await prisma.user.update({
-    where: { id: user.id },
-    data: {
-      isPhoneVerified: true,
-      phoneVerifiedAt: new Date(),
-    },
-  })
-
-  // Delete used code
-  await redis.del(`phone_verify:${normalizedPhone}`)
-
-  // Generate tokens
-  const accessToken = await generateAccessToken({
-    userId: user.id,
-    phone: user.phone!,
-  })
-
-  const refreshToken = await generateRefreshToken({
-    userId: user.id,
-    phone: user.phone!,
-  })
+  const accessToken = await generateAccessToken({ userId: user.id, phone: user.phone })
+  const refreshToken = await generateRefreshToken({ userId: user.id, phone: user.phone })
 
   return { success: true, accessToken, refreshToken }
 }

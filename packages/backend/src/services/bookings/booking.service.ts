@@ -1,16 +1,14 @@
 /**
  * Booking Service
- * Core booking lifecycle management
  */
 
-import { prisma } from '../../lib/prisma/client'
+import { supabase } from '../../lib/supabase/client'
 import type {
   CreateBookingInput,
   CancelBookingInput,
   CompleteBookingInput,
 } from '@handy-man/shared/validators'
-
-// ── Reference number ──────────────────────────────────────────────────────────
+import type { CreateAddressInput } from '@handy-man/shared/validators'
 
 function generateBookingRef(): string {
   const year = new Date().getFullYear()
@@ -18,151 +16,169 @@ function generateBookingRef(): string {
   return `HM-${year}-${rand}`
 }
 
-// ── Create ────────────────────────────────────────────────────────────────────
-
 export async function createBooking(userId: string, input: CreateBookingInput) {
-  // Resolve client
-  const client = await prisma.client.findUnique({ where: { userId } })
-  if (!client) {
-    return { success: false, error: 'Client profile not found', code: 'NOT_FOUND' }
-  }
+  const { data: client } = await supabase
+    .from('clients')
+    .select('id')
+    .eq('user_id', userId)
+    .maybeSingle()
 
-  // Validate address belongs to client
-  const address = await prisma.address.findFirst({
-    where: { id: input.addressId, clientId: client.id },
-  })
-  if (!address) {
-    return { success: false, error: 'Address not found', code: 'NOT_FOUND' }
-  }
+  if (!client) return { success: false, error: 'Client profile not found', code: 'NOT_FOUND' }
 
-  // Validate service category
-  const category = await prisma.serviceCategory.findUnique({
-    where: { id: input.serviceCategoryId, isActive: true },
-  })
-  if (!category) {
-    return { success: false, error: 'Service category not found', code: 'NOT_FOUND' }
-  }
+  const { data: address } = await supabase
+    .from('addresses')
+    .select('id')
+    .eq('id', input.addressId)
+    .eq('client_id', client.id)
+    .maybeSingle()
 
-  // Validate pro if pre-selected
+  if (!address) return { success: false, error: 'Address not found', code: 'NOT_FOUND' }
+
+  const { data: category } = await supabase
+    .from('service_categories')
+    .select('id, base_price')
+    .eq('id', input.serviceCategoryId)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (!category) return { success: false, error: 'Service category not found', code: 'NOT_FOUND' }
+
   if (input.professionalId) {
-    const pro = await prisma.professional.findUnique({
-      where: { id: input.professionalId, isVerified: true, isAvailable: true },
-    })
-    if (!pro) {
-      return { success: false, error: 'Professional not available', code: 'NOT_FOUND' }
-    }
+    const { data: pro } = await supabase
+      .from('professionals')
+      .select('id')
+      .eq('id', input.professionalId)
+      .eq('is_verified', true)
+      .eq('is_available', true)
+      .maybeSingle()
+
+    if (!pro) return { success: false, error: 'Professional not available', code: 'NOT_FOUND' }
   }
 
-  // Generate unique ref
   let bookingReference = generateBookingRef()
-  while (await prisma.booking.findUnique({ where: { bookingReference } })) {
+  while (true) {
+    const { data: exists } = await supabase
+      .from('bookings')
+      .select('id')
+      .eq('booking_reference', bookingReference)
+      .maybeSingle()
+    if (!exists) break
     bookingReference = generateBookingRef()
   }
 
-  const estimatedPrice = category.basePrice ?? '0'
+  const { data: booking, error } = await supabase
+    .from('bookings')
+    .insert({
+      booking_reference: bookingReference,
+      client_id: client.id,
+      professional_id: input.professionalId ?? null,
+      service_category_id: input.serviceCategoryId,
+      address_id: input.addressId,
+      scheduled_date: input.scheduledDate,
+      scheduled_time_start: input.scheduledTimeStart,
+      client_description: input.clientDescription ?? null,
+      estimated_price: category.base_price ?? 0,
+      is_emergency: input.isEmergency ?? false,
+    })
+    .select(`
+      *,
+      service_categories(name, slug),
+      addresses(label, city, address_line1),
+      professionals(users(first_name, last_name, profile_photo_url))
+    `)
+    .single()
 
-  const booking = await prisma.booking.create({
-    data: {
-      bookingReference,
-      clientId: client.id,
-      professionalId: input.professionalId ?? null,
-      serviceCategoryId: input.serviceCategoryId,
-      addressId: input.addressId,
-      scheduledDate: new Date(input.scheduledDate),
-      scheduledTimeStart: input.scheduledTimeStart,
-      clientDescription: input.clientDescription,
-      estimatedPrice,
-      isEmergency: input.isEmergency ?? false,
-      statusHistory: {
-        create: { newStatus: 'PENDING', notes: 'Booking created' },
-      },
-    },
-    include: {
-      serviceCategory: true,
-      address: true,
-      professional: { include: { user: { select: { firstName: true, lastName: true, profilePhotoUrl: true } } } },
-    },
+  if (error) return { success: false, error: error.message, code: 'SERVER_ERROR' }
+
+  await supabase.from('booking_status_history').insert({
+    booking_id: booking.id,
+    new_status: 'PENDING',
+    notes: 'Booking created',
   })
 
-  // Increment client's total bookings
-  await prisma.client.update({
-    where: { id: client.id },
-    data: { totalBookings: { increment: 1 } },
-  })
+  await supabase
+    .from('clients')
+    .update({ total_bookings: (await supabase.from('clients').select('total_bookings').eq('id', client.id).single()).data?.total_bookings + 1 })
+    .eq('id', client.id)
 
-  return { success: true, booking }
+  return { success: true, booking: { ...booking, bookingReference: booking.booking_reference } }
 }
 
-// ── Read ──────────────────────────────────────────────────────────────────────
-
 export async function getClientBookings(userId: string, filter: 'upcoming' | 'past' | 'all' = 'all') {
-  const client = await prisma.client.findUnique({ where: { userId } })
-  if (!client) return { success: false, error: 'Client not found', code: 'NOT_FOUND' }
+  const { data: client } = await supabase
+    .from('clients')
+    .select('id')
+    .eq('user_id', userId)
+    .maybeSingle()
 
-  const now = new Date()
+  if (!client) return { success: true, bookings: [] }
 
-  const where = {
-    clientId: client.id,
-    ...(filter === 'upcoming' && {
-      status: { in: ['PENDING', 'CONFIRMED', 'IN_PROGRESS'] as const },
-    }),
-    ...(filter === 'past' && {
-      status: { in: ['COMPLETED', 'CANCELLED'] as const },
-    }),
+  let query = supabase
+    .from('bookings')
+    .select(`
+      *,
+      service_categories(name, slug),
+      addresses(label, city, address_line1),
+      professionals(users(first_name, last_name, profile_photo_url))
+    `)
+    .eq('client_id', client.id)
+
+  if (filter === 'upcoming') {
+    query = query.in('status', ['PENDING', 'CONFIRMED', 'IN_PROGRESS'])
+  } else if (filter === 'past') {
+    query = query.in('status', ['COMPLETED', 'CANCELLED'])
   }
 
-  const bookings = await prisma.booking.findMany({
-    where,
-    orderBy: { scheduledDate: filter === 'past' ? 'desc' : 'asc' },
-    include: {
-      serviceCategory: { select: { name: true, slug: true } },
-      address: { select: { label: true, city: true, addressLine1: true } },
-      professional: {
-        include: {
-          user: { select: { firstName: true, lastName: true, profilePhotoUrl: true } },
-        },
-      },
-    },
-  })
+  query = query.order('scheduled_date', { ascending: filter !== 'past' })
+
+  const { data: bookings, error } = await query
+  if (error) return { success: false, error: error.message, code: 'SERVER_ERROR' }
 
   return { success: true, bookings }
 }
 
 export async function getBookingById(bookingId: string, userId: string) {
-  const client = await prisma.client.findUnique({ where: { userId } })
+  const { data: client } = await supabase
+    .from('clients')
+    .select('id')
+    .eq('user_id', userId)
+    .maybeSingle()
 
-  const booking = await prisma.booking.findFirst({
-    where: {
-      id: bookingId,
-      ...(client ? { clientId: client.id } : {}),
-    },
-    include: {
-      serviceCategory: true,
-      address: true,
-      professional: {
-        include: {
-          user: { select: { firstName: true, lastName: true, profilePhotoUrl: true, phone: true } },
-        },
-      },
-      statusHistory: { orderBy: { createdAt: 'asc' } },
-      review: true,
-      payment: true,
-    },
-  })
+  const query = supabase
+    .from('bookings')
+    .select(`
+      *,
+      service_categories(*),
+      addresses(*),
+      professionals(users(first_name, last_name, profile_photo_url, phone)),
+      booking_status_history(*),
+      reviews(*),
+      payments(*)
+    `)
+    .eq('id', bookingId)
 
-  if (!booking) return { success: false, error: 'Booking not found', code: 'NOT_FOUND' }
+  if (client) query.eq('client_id', client.id)
+
+  const { data: booking, error } = await query.maybeSingle()
+  if (error || !booking) return { success: false, error: 'Booking not found', code: 'NOT_FOUND' }
   return { success: true, booking }
 }
 
-// ── Cancel ────────────────────────────────────────────────────────────────────
-
 export async function cancelBooking(bookingId: string, userId: string, input: CancelBookingInput) {
-  const client = await prisma.client.findUnique({ where: { userId } })
+  const { data: client } = await supabase
+    .from('clients')
+    .select('id')
+    .eq('user_id', userId)
+    .maybeSingle()
+
   if (!client) return { success: false, error: 'Client not found', code: 'NOT_FOUND' }
 
-  const booking = await prisma.booking.findFirst({
-    where: { id: bookingId, clientId: client.id },
-  })
+  const { data: booking } = await supabase
+    .from('bookings')
+    .select('id, status')
+    .eq('id', bookingId)
+    .eq('client_id', client.id)
+    .maybeSingle()
 
   if (!booking) return { success: false, error: 'Booking not found', code: 'NOT_FOUND' }
 
@@ -170,170 +186,226 @@ export async function cancelBooking(bookingId: string, userId: string, input: Ca
     return { success: false, error: 'Booking cannot be cancelled at this stage', code: 'INVALID_STATUS' }
   }
 
-  const updated = await prisma.booking.update({
-    where: { id: bookingId },
-    data: {
+  const { data: updated, error } = await supabase
+    .from('bookings')
+    .update({
       status: 'CANCELLED',
-      cancellationReason: input.reason,
-      cancelledBy: 'CLIENT',
-      cancelledAt: new Date(),
-      statusHistory: {
-        create: {
-          oldStatus: booking.status,
-          newStatus: 'CANCELLED',
-          changedByUserId: userId,
-          notes: input.reason,
-        },
-      },
-    },
+      cancellation_reason: input.reason,
+      cancelled_by: 'CLIENT',
+      cancelled_at: new Date().toISOString(),
+    })
+    .eq('id', bookingId)
+    .select()
+    .single()
+
+  if (error) return { success: false, error: error.message, code: 'SERVER_ERROR' }
+
+  await supabase.from('booking_status_history').insert({
+    booking_id: bookingId,
+    old_status: booking.status,
+    new_status: 'CANCELLED',
+    changed_by_user_id: userId,
+    notes: input.reason,
   })
 
   return { success: true, booking: updated }
 }
 
-// ── Professional: accept/decline ──────────────────────────────────────────────
-
 export async function acceptBooking(bookingId: string, userId: string) {
-  const professional = await prisma.professional.findUnique({ where: { userId } })
+  const { data: professional } = await supabase
+    .from('professionals')
+    .select('id')
+    .eq('user_id', userId)
+    .maybeSingle()
+
   if (!professional) return { success: false, error: 'Professional not found', code: 'NOT_FOUND' }
 
-  const booking = await prisma.booking.findUnique({ where: { id: bookingId } })
-  if (!booking || booking.status !== 'PENDING') {
-    return { success: false, error: 'Booking not available', code: 'INVALID_STATUS' }
-  }
+  const { data: booking } = await supabase
+    .from('bookings')
+    .select('id, status')
+    .eq('id', bookingId)
+    .eq('status', 'PENDING')
+    .maybeSingle()
 
-  const updated = await prisma.booking.update({
-    where: { id: bookingId },
-    data: {
-      professionalId: professional.id,
-      status: 'CONFIRMED',
-      statusHistory: {
-        create: {
-          oldStatus: 'PENDING',
-          newStatus: 'CONFIRMED',
-          changedByUserId: userId,
-        },
-      },
-    },
+  if (!booking) return { success: false, error: 'Booking not available', code: 'INVALID_STATUS' }
+
+  const { data: updated, error } = await supabase
+    .from('bookings')
+    .update({ professional_id: professional.id, status: 'CONFIRMED' })
+    .eq('id', bookingId)
+    .select()
+    .single()
+
+  if (error) return { success: false, error: error.message, code: 'SERVER_ERROR' }
+
+  await supabase.from('booking_status_history').insert({
+    booking_id: bookingId,
+    old_status: 'PENDING',
+    new_status: 'CONFIRMED',
+    changed_by_user_id: userId,
   })
 
   return { success: true, booking: updated }
 }
 
 export async function startBooking(bookingId: string, userId: string) {
-  const professional = await prisma.professional.findUnique({ where: { userId } })
+  const { data: professional } = await supabase
+    .from('professionals')
+    .select('id')
+    .eq('user_id', userId)
+    .maybeSingle()
+
   if (!professional) return { success: false, error: 'Professional not found', code: 'NOT_FOUND' }
 
-  const booking = await prisma.booking.findFirst({
-    where: { id: bookingId, professionalId: professional.id, status: 'CONFIRMED' },
-  })
+  const { data: booking } = await supabase
+    .from('bookings')
+    .select('id, status')
+    .eq('id', bookingId)
+    .eq('professional_id', professional.id)
+    .eq('status', 'CONFIRMED')
+    .maybeSingle()
+
   if (!booking) return { success: false, error: 'Booking not found', code: 'NOT_FOUND' }
 
-  const updated = await prisma.booking.update({
-    where: { id: bookingId },
-    data: {
-      status: 'IN_PROGRESS',
-      actualStartTime: new Date(),
-      statusHistory: {
-        create: { oldStatus: 'CONFIRMED', newStatus: 'IN_PROGRESS', changedByUserId: userId },
-      },
-    },
+  const { data: updated, error } = await supabase
+    .from('bookings')
+    .update({ status: 'IN_PROGRESS', actual_start_time: new Date().toISOString() })
+    .eq('id', bookingId)
+    .select()
+    .single()
+
+  if (error) return { success: false, error: error.message, code: 'SERVER_ERROR' }
+
+  await supabase.from('booking_status_history').insert({
+    booking_id: bookingId,
+    old_status: 'CONFIRMED',
+    new_status: 'IN_PROGRESS',
+    changed_by_user_id: userId,
   })
 
   return { success: true, booking: updated }
 }
 
-export async function completeBooking(
-  bookingId: string,
-  userId: string,
-  input: CompleteBookingInput
-) {
-  const professional = await prisma.professional.findUnique({ where: { userId } })
+export async function completeBooking(bookingId: string, userId: string, input: CompleteBookingInput) {
+  const { data: professional } = await supabase
+    .from('professionals')
+    .select('id, platform_fee_percentage')
+    .eq('user_id', userId)
+    .maybeSingle()
+
   if (!professional) return { success: false, error: 'Professional not found', code: 'NOT_FOUND' }
 
-  const booking = await prisma.booking.findFirst({
-    where: { id: bookingId, professionalId: professional.id, status: 'IN_PROGRESS' },
-  })
+  const { data: booking } = await supabase
+    .from('bookings')
+    .select('id, status, estimated_price, platform_fee_percentage')
+    .eq('id', bookingId)
+    .eq('professional_id', professional.id)
+    .eq('status', 'IN_PROGRESS')
+    .maybeSingle()
+
   if (!booking) return { success: false, error: 'Booking not found', code: 'NOT_FOUND' }
 
-  const finalPrice = input.finalPrice
-    ? String(input.finalPrice)
-    : booking.estimatedPrice
-  const platformFeeAmount = (Number(finalPrice) * Number(booking.platformFeePercentage)) / 100
-  const professionalEarnings = Number(finalPrice) - platformFeeAmount
+  const finalPrice = input.finalPrice ?? Number(booking.estimated_price)
+  const platformFeeAmount = (finalPrice * Number(booking.platform_fee_percentage)) / 100
+  const professionalEarnings = finalPrice - platformFeeAmount
 
-  const updated = await prisma.booking.update({
-    where: { id: bookingId },
-    data: {
+  const { data: updated, error } = await supabase
+    .from('bookings')
+    .update({
       status: 'COMPLETED',
-      actualEndTime: new Date(),
-      completedAt: new Date(),
-      finalPrice,
-      priceAdjustmentReason: input.priceAdjustmentReason,
-      professionalNotes: input.professionalNotes,
-      platformFeeAmount: String(platformFeeAmount),
-      professionalEarnings: String(professionalEarnings),
-      statusHistory: {
-        create: { oldStatus: 'IN_PROGRESS', newStatus: 'COMPLETED', changedByUserId: userId },
-      },
-    },
+      actual_end_time: new Date().toISOString(),
+      completed_at: new Date().toISOString(),
+      final_price: finalPrice,
+      price_adjustment_reason: input.priceAdjustmentReason ?? null,
+      professional_notes: input.professionalNotes ?? null,
+      platform_fee_amount: platformFeeAmount,
+      professional_earnings: professionalEarnings,
+    })
+    .eq('id', bookingId)
+    .select()
+    .single()
+
+  if (error) return { success: false, error: error.message, code: 'SERVER_ERROR' }
+
+  await supabase.from('booking_status_history').insert({
+    booking_id: bookingId,
+    old_status: 'IN_PROGRESS',
+    new_status: 'COMPLETED',
+    changed_by_user_id: userId,
   })
 
-  // Update professional stats
-  await prisma.professional.update({
-    where: { id: professional.id },
-    data: {
-      totalJobsCompleted: { increment: 1 },
-      totalEarnings: { increment: professionalEarnings },
-      availableBalance: { increment: professionalEarnings },
-    },
-  })
+  const { data: pro } = await supabase
+    .from('professionals')
+    .select('total_jobs_completed, total_earnings, available_balance')
+    .eq('id', professional.id)
+    .single()
+
+  if (pro) {
+    await supabase.from('professionals').update({
+      total_jobs_completed: pro.total_jobs_completed + 1,
+      total_earnings: Number(pro.total_earnings) + professionalEarnings,
+      available_balance: Number(pro.available_balance) + professionalEarnings,
+    }).eq('id', professional.id)
+  }
 
   return { success: true, booking: updated }
 }
-
-// ── Address management ────────────────────────────────────────────────────────
 
 export async function getClientAddresses(userId: string) {
-  const client = await prisma.client.findUnique({ where: { userId } })
+  const { data: client } = await supabase
+    .from('clients')
+    .select('id')
+    .eq('user_id', userId)
+    .maybeSingle()
+
   if (!client) return { success: false, error: 'Client not found', code: 'NOT_FOUND' }
 
-  const addresses = await prisma.address.findMany({
-    where: { clientId: client.id },
-    orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
-  })
+  const { data: addresses, error } = await supabase
+    .from('addresses')
+    .select('*')
+    .eq('client_id', client.id)
+    .order('is_default', { ascending: false })
+    .order('created_at', { ascending: true })
 
+  if (error) return { success: false, error: error.message, code: 'SERVER_ERROR' }
   return { success: true, addresses }
 }
 
-export async function createClientAddress(userId: string, input: import('@handy-man/shared/validators').CreateAddressInput) {
-  const client = await prisma.client.findUnique({ where: { userId } })
+export async function createClientAddress(userId: string, input: CreateAddressInput) {
+  const { data: client } = await supabase
+    .from('clients')
+    .select('id')
+    .eq('user_id', userId)
+    .maybeSingle()
+
   if (!client) return { success: false, error: 'Client not found', code: 'NOT_FOUND' }
 
-  // If setting as default, unset all others
   if (input.isDefault) {
-    await prisma.address.updateMany({
-      where: { clientId: client.id },
-      data: { isDefault: false },
-    })
+    await supabase
+      .from('addresses')
+      .update({ is_default: false })
+      .eq('client_id', client.id)
   }
 
-  const address = await prisma.address.create({
-    data: {
-      clientId: client.id,
+  const { data: address, error } = await supabase
+    .from('addresses')
+    .insert({
+      client_id: client.id,
       label: input.label,
-      addressLine1: input.addressLine1,
-      addressLine2: input.addressLine2,
+      address_line1: input.addressLine1,
+      address_line2: input.addressLine2 ?? null,
       city: input.city,
       province: input.province,
-      postalCode: input.postalCode,
+      postal_code: input.postalCode,
       country: input.country ?? 'South Africa',
-      latitude: input.latitude ? String(input.latitude) : undefined,
-      longitude: input.longitude ? String(input.longitude) : undefined,
-      specialInstructions: input.specialInstructions,
-      isDefault: input.isDefault ?? false,
-    },
-  })
+      latitude: input.latitude ?? null,
+      longitude: input.longitude ?? null,
+      special_instructions: input.specialInstructions ?? null,
+      is_default: input.isDefault ?? false,
+    })
+    .select()
+    .single()
 
+  if (error) return { success: false, error: error.message, code: 'SERVER_ERROR' }
   return { success: true, address }
 }

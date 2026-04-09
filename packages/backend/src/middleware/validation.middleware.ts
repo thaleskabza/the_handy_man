@@ -37,7 +37,7 @@ export function validateRequest<T>(schema: ZodSchema<T>) {
             code: 'VALIDATION_ERROR',
             details,
           },
-          HTTP_STATUS.BAD_REQUEST
+          HTTP_STATUS.UNPROCESSABLE_ENTITY
         )
       }
 
@@ -47,7 +47,7 @@ export function validateRequest<T>(schema: ZodSchema<T>) {
           error: 'Invalid request body',
           code: 'VALIDATION_ERROR',
         },
-        HTTP_STATUS.BAD_REQUEST
+        HTTP_STATUS.UNPROCESSABLE_ENTITY
       )
     }
   }

@@ -1,17 +1,15 @@
 /**
  * Signup Service
- * Handles user registration logic
  */
 
-import { prisma } from '../../lib/prisma/client'
+import { supabase } from '../../lib/supabase/client'
 import { hashPassword } from './password.service'
 import { generateVerificationToken, generateVerificationCode } from './token.service'
 import { sendVerificationEmail } from '../../lib/email/resend.client'
 import { sendVerificationSms } from '../../lib/sms/twilio.client'
-import { getRedisClient } from '../../lib/redis/client'
 import type { SignupEmailInput, SignupPhoneInput } from '@handy-man/shared/validators'
 
-const VERIFICATION_CODE_EXPIRY = 10 * 60 // 10 minutes in seconds
+const VERIFICATION_CODE_EXPIRY_MS = 10 * 60 * 1000 // 10 minutes
 
 interface SignupResult {
   success: boolean
@@ -21,93 +19,90 @@ interface SignupResult {
 }
 
 export async function signupWithEmail(input: SignupEmailInput): Promise<SignupResult> {
-  const { email, password, firstName, lastName, acceptedTerms, acceptedPrivacy, marketingOptIn } =
-    input
+  const { email, password, firstName, lastName, marketingOptIn } = input
 
-  // Check if email already exists
-  const existingUser = await prisma.user.findUnique({
-    where: { email: email.toLowerCase() },
-  })
+  const { data: existing } = await supabase
+    .from('users')
+    .select('id')
+    .eq('email', email.toLowerCase())
+    .maybeSingle()
 
-  if (existingUser) {
+  if (existing) {
     return { success: false, error: 'Email already registered', code: 'EMAIL_EXISTS' }
   }
 
-  // Hash password
   const passwordHash = await hashPassword(password)
-
-  // Generate verification token
   const verificationToken = generateVerificationToken()
 
-  // Create user
-  const user = await prisma.user.create({
-    data: {
+  const { data: user, error } = await supabase
+    .from('users')
+    .insert({
       email: email.toLowerCase(),
-      passwordHash,
-      firstName,
-      lastName,
-      registrationMethod: 'EMAIL_PASSWORD',
-      acceptedTermsAt: new Date(),
-      acceptedPrivacyAt: new Date(),
-      marketingOptIn: marketingOptIn ?? false,
-      emailVerificationToken: verificationToken,
-      emailVerificationExpiry: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
-    },
-  })
+      password_hash: passwordHash,
+      first_name: firstName,
+      last_name: lastName,
+      registration_method: 'EMAIL_PASSWORD',
+      accepted_terms_at: new Date().toISOString(),
+      accepted_privacy_at: new Date().toISOString(),
+      marketing_opt_in: marketingOptIn ?? false,
+      email_verification_token: verificationToken,
+      email_verification_expiry: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    })
+    .select('id')
+    .single()
 
-  // Send verification email
+  if (error || !user) {
+    return { success: false, error: 'Failed to create user', code: 'SERVER_ERROR' }
+  }
+
+  // Auto-create client profile
+  await supabase.from('clients').insert({ user_id: user.id })
+
   const webUrl = process.env.WEB_URL || 'http://localhost:3001'
   const verificationUrl = `${webUrl}/auth/verify-email?token=${verificationToken}`
 
-  await sendVerificationEmail({
-    to: email,
-    firstName,
-    verificationUrl,
-  })
+  await sendVerificationEmail({ to: email, firstName, verificationUrl })
 
   return { success: true, userId: user.id }
 }
 
 export async function signupWithPhone(input: SignupPhoneInput): Promise<SignupResult> {
-  const { phone, firstName, lastName, acceptedTerms, acceptedPrivacy, marketingOptIn } = input
-
-  // Normalize phone number (basic normalization)
+  const { phone, firstName, lastName, marketingOptIn } = input
   const normalizedPhone = phone.replace(/\s/g, '')
 
-  // Check if phone already exists
-  const existingUser = await prisma.user.findUnique({
-    where: { phone: normalizedPhone },
-  })
+  const { data: existing } = await supabase
+    .from('users')
+    .select('id')
+    .eq('phone', normalizedPhone)
+    .maybeSingle()
 
-  if (existingUser) {
+  if (existing) {
     return { success: false, error: 'Phone number already registered', code: 'PHONE_EXISTS' }
   }
 
-  // Generate verification code
   const verificationCode = generateVerificationCode()
 
-  // Create user
-  const user = await prisma.user.create({
-    data: {
+  const { data: user, error } = await supabase
+    .from('users')
+    .insert({
       phone: normalizedPhone,
-      firstName,
-      lastName,
-      registrationMethod: 'PHONE',
-      acceptedTermsAt: new Date(),
-      acceptedPrivacyAt: new Date(),
-      marketingOptIn: marketingOptIn ?? false,
-    },
-  })
+      first_name: firstName,
+      last_name: lastName,
+      registration_method: 'PHONE',
+      accepted_terms_at: new Date().toISOString(),
+      accepted_privacy_at: new Date().toISOString(),
+      marketing_opt_in: marketingOptIn ?? false,
+      phone_verification_code: verificationCode,
+      phone_verification_expiry: new Date(Date.now() + VERIFICATION_CODE_EXPIRY_MS).toISOString(),
+    })
+    .select('id')
+    .single()
 
-  // Store verification code in Redis
-  const redis = getRedisClient()
-  await redis.setex(`phone_verify:${normalizedPhone}`, VERIFICATION_CODE_EXPIRY, verificationCode)
+  if (error || !user) {
+    return { success: false, error: 'Failed to create user', code: 'SERVER_ERROR' }
+  }
 
-  // Send SMS
-  await sendVerificationSms({
-    to: normalizedPhone,
-    code: verificationCode,
-  })
+  await sendVerificationSms({ to: normalizedPhone, code: verificationCode })
 
   return { success: true, userId: user.id }
 }

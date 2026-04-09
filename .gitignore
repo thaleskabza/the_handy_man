@@ -45,3 +45,4 @@ playwright-report/
 
 .claude/*
 .specify/*
+.agents/*

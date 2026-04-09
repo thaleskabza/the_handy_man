@@ -121,6 +121,12 @@ model User {
   // Phone verification
   isPhoneVerified          Boolean             @default(false) @map("is_phone_verified")
   phoneVerifiedAt          DateTime?           @map("phone_verified_at")
+  phoneVerificationCode    String?             @map("phone_verification_code")
+  phoneVerificationExpiry  DateTime?           @map("phone_verification_expiry")
+
+  // Password reset
+  passwordResetToken       String?             @map("password_reset_token")
+  passwordResetExpiry      DateTime?           @map("password_reset_expiry")
 
   // Consent tracking
   acceptedTermsAt          DateTime            @map("accepted_terms_at")

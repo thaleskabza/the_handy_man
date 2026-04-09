@@ -38,6 +38,7 @@ export default defineConfig({
     {
       name: 'api',
       testMatch: '**/tests/api/**/*.spec.ts',
+      fullyParallel: false,
       use: { ...devices['Desktop Chrome'] },
     },
     // E2E browser tests

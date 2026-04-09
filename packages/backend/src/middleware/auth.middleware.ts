@@ -6,7 +6,7 @@
 import type { Context, Next } from 'hono'
 import { HTTP_STATUS } from '@handy-man/shared/constants'
 import { verifyToken } from '../services/auth/token.service'
-import { prisma } from '../lib/prisma/client'
+import { supabase } from '../lib/supabase/client'
 
 declare module 'hono' {
   interface ContextVariableMap {
@@ -37,10 +37,11 @@ export async function authenticate(c: Context, next: Next) {
   }
 
   // Verify user still exists and is active
-  const user = await prisma.user.findUnique({
-    where: { id: payload.userId },
-    select: { id: true, role: true },
-  })
+  const { data: user } = await supabase
+    .from('users')
+    .select('id, role')
+    .eq('id', payload.userId)
+    .maybeSingle()
 
   if (!user) {
     return c.json(

@@ -7,7 +7,7 @@
  */
 
 import { Hono } from 'hono'
-import { prisma } from '../../lib/prisma/client'
+import { supabase } from '../../lib/supabase/client'
 
 const router = new Hono()
 
@@ -23,15 +23,20 @@ router.post('/verify-user', async (c) => {
     return c.json({ success: false, error: 'email is required' }, 422)
   }
 
-  const user = await prisma.user.findUnique({ where: { email } })
+  const { data: user } = await supabase
+    .from('users')
+    .select('id')
+    .eq('email', email)
+    .maybeSingle()
+
   if (!user) {
     return c.json({ success: false, error: 'User not found' }, 404)
   }
 
-  await prisma.user.update({
-    where: { email },
-    data: { isEmailVerified: true, emailVerifiedAt: new Date() },
-  })
+  await supabase
+    .from('users')
+    .update({ is_email_verified: true, email_verified_at: new Date().toISOString() })
+    .eq('email', email)
 
   return c.json({ success: true, message: 'User verified' })
 })

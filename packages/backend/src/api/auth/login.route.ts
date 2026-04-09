@@ -14,7 +14,7 @@ const router = new Hono()
 
 const loginRateLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  maxRequests: 10,
+  maxRequests: process.env.NODE_ENV === 'development' ? 1000 : 10,
   keyPrefix: 'ratelimit:login',
 })
 

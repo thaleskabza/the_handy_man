@@ -1,9 +1,8 @@
 /**
  * Login Service
- * Handles user authentication and session management
  */
 
-import { prisma } from '../../lib/prisma/client'
+import { supabase } from '../../lib/supabase/client'
 import { verifyPassword } from './password.service'
 import { generateAccessToken, generateRefreshToken } from './token.service'
 import type { LoginInput } from '@handy-man/shared/validators'
@@ -21,19 +20,17 @@ interface LoginResult {
 export async function login(input: LoginInput): Promise<LoginResult> {
   const { email, phone, password } = input
 
-  // Find user by email or phone
-  const user = await prisma.user.findFirst({
-    where: email
-      ? { email: email.toLowerCase() }
-      : { phone: phone!.replace(/\s/g, '') },
-  })
+  const { data: user, error } = await supabase
+    .from('users')
+    .select('id, email, phone, password_hash, role, is_email_verified, is_phone_verified')
+    .eq(email ? 'email' : 'phone', email ? email.toLowerCase() : phone!.replace(/\s/g, ''))
+    .maybeSingle()
 
-  if (!user) {
+  if (error || !user) {
     return { success: false, error: 'Invalid credentials', code: 'INVALID_CREDENTIALS' }
   }
 
-  // Require password (social-only accounts cannot log in with password)
-  if (!user.passwordHash) {
+  if (!user.password_hash) {
     return {
       success: false,
       error: 'This account uses social login. Please sign in with Google or Facebook.',
@@ -41,13 +38,12 @@ export async function login(input: LoginInput): Promise<LoginResult> {
     }
   }
 
-  const passwordValid = await verifyPassword(password, user.passwordHash)
+  const passwordValid = await verifyPassword(password, user.password_hash)
   if (!passwordValid) {
     return { success: false, error: 'Invalid credentials', code: 'INVALID_CREDENTIALS' }
   }
 
-  // Check email/phone verification
-  if (email && !user.isEmailVerified) {
+  if (email && !user.is_email_verified) {
     return {
       success: false,
       error: 'Please verify your email address before logging in.',
@@ -55,7 +51,7 @@ export async function login(input: LoginInput): Promise<LoginResult> {
     }
   }
 
-  if (phone && !user.isPhoneVerified) {
+  if (phone && !user.is_phone_verified) {
     return {
       success: false,
       error: 'Please verify your phone number before logging in.',
@@ -75,33 +71,30 @@ export async function login(input: LoginInput): Promise<LoginResult> {
     phone: user.phone ?? undefined,
   })
 
-  // Persist refresh token in DB
   const expiresAt = new Date()
   expiresAt.setDate(expiresAt.getDate() + REFRESH_TOKEN_EXPIRY_DAYS)
 
-  await prisma.refreshToken.create({
-    data: {
-      userId: user.id,
-      token: refreshTokenValue,
-      expiresAt,
-    },
+  await supabase.from('refresh_tokens').insert({
+    user_id: user.id,
+    token: refreshTokenValue,
+    expires_at: expiresAt.toISOString(),
   })
 
   return { success: true, accessToken, refreshToken: refreshTokenValue }
 }
 
 export async function refreshSession(token: string): Promise<LoginResult> {
-  // Look up the stored token
-  const stored = await prisma.refreshToken.findUnique({
-    where: { token },
-    include: { user: true },
-  })
+  const { data: stored, error } = await supabase
+    .from('refresh_tokens')
+    .select('id, user_id, expires_at, users(id, email, phone, role)')
+    .eq('token', token)
+    .maybeSingle()
 
-  if (!stored || stored.expiresAt < new Date()) {
+  if (error || !stored || new Date(stored.expires_at) < new Date()) {
     return { success: false, error: 'Invalid or expired refresh token', code: 'INVALID_TOKEN' }
   }
 
-  const { user } = stored
+  const user = (Array.isArray(stored.users) ? stored.users[0] : stored.users) as { id: string; email: string | null; phone: string | null; role: string }
 
   const accessToken = await generateAccessToken({
     userId: user.id,
@@ -109,7 +102,6 @@ export async function refreshSession(token: string): Promise<LoginResult> {
     phone: user.phone ?? undefined,
   })
 
-  // Rotate refresh token
   const newRefreshToken = await generateRefreshToken({
     userId: user.id,
     email: user.email ?? undefined,
@@ -119,17 +111,17 @@ export async function refreshSession(token: string): Promise<LoginResult> {
   const expiresAt = new Date()
   expiresAt.setDate(expiresAt.getDate() + REFRESH_TOKEN_EXPIRY_DAYS)
 
-  await prisma.$transaction([
-    prisma.refreshToken.delete({ where: { id: stored.id } }),
-    prisma.refreshToken.create({
-      data: { userId: user.id, token: newRefreshToken, expiresAt },
-    }),
-  ])
+  await supabase.from('refresh_tokens').delete().eq('id', stored.id)
+  await supabase.from('refresh_tokens').insert({
+    user_id: user.id,
+    token: newRefreshToken,
+    expires_at: expiresAt.toISOString(),
+  })
 
   return { success: true, accessToken, refreshToken: newRefreshToken }
 }
 
 export async function logout(token: string): Promise<{ success: boolean }> {
-  await prisma.refreshToken.deleteMany({ where: { token } })
+  await supabase.from('refresh_tokens').delete().eq('token', token)
   return { success: true }
 }

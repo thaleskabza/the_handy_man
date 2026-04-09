@@ -44,7 +44,7 @@ router.get('/:slug', async (c) => {
   const { slug } = c.req.param()
   const category = await getCategoryBySlug(slug)
 
-  if (!category || !category.isActive) {
+  if (!category || !category.is_active) {
     return c.json(
       { success: false, error: 'Category not found', code: 'NOT_FOUND' },
       HTTP_STATUS.NOT_FOUND

@@ -2,98 +2,125 @@
  * Service Category Service
  */
 
-import { prisma } from '../../lib/prisma/client'
+import { supabase } from '../../lib/supabase/client'
 import type {
   CreateServiceCategoryInput,
   UpdateServiceCategoryInput,
 } from '@handy-man/shared/validators'
 
 export async function getAllCategories(activeOnly = true) {
-  return prisma.serviceCategory.findMany({
-    where: activeOnly ? { isActive: true } : undefined,
-    orderBy: [{ displayOrder: 'asc' }, { name: 'asc' }],
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      description: true,
-      iconUrl: true,
-      isActive: true,
-      displayOrder: true,
-      estimatedDurationHours: true,
-      basePrice: true,
-    },
-  })
+  let query = supabase
+    .from('service_categories')
+    .select('id, name, slug, description, icon_url, is_active, display_order, estimated_duration_hours, base_price')
+    .order('display_order', { ascending: true })
+    .order('name', { ascending: true })
+
+  if (activeOnly) query = query.eq('is_active', true)
+
+  const { data, error } = await query
+  if (error) throw error
+
+  return (data ?? []).map((c) => ({
+    id: c.id,
+    name: c.name,
+    slug: c.slug,
+    description: c.description,
+    iconUrl: c.icon_url,
+    isActive: c.is_active,
+    displayOrder: c.display_order,
+    estimatedDurationHours: c.estimated_duration_hours,
+    basePrice: c.base_price,
+  }))
 }
 
 export async function getCategoryBySlug(slug: string) {
-  return prisma.serviceCategory.findUnique({
-    where: { slug },
-  })
+  const { data, error } = await supabase
+    .from('service_categories')
+    .select('*')
+    .eq('slug', slug)
+    .maybeSingle()
+
+  if (error) throw error
+  return data
 }
 
 export async function createCategory(input: CreateServiceCategoryInput) {
-  const existing = await prisma.serviceCategory.findFirst({
-    where: { OR: [{ name: input.name }, { slug: input.slug }] },
-  })
+  const { data: existing } = await supabase
+    .from('service_categories')
+    .select('id, name, slug')
+    .or(`name.eq.${input.name},slug.eq.${input.slug}`)
+    .maybeSingle()
 
   if (existing) {
     const field = existing.name === input.name ? 'name' : 'slug'
     return { success: false, error: `A category with that ${field} already exists`, code: 'CONFLICT' }
   }
 
-  const category = await prisma.serviceCategory.create({
-    data: {
+  const { data: category, error } = await supabase
+    .from('service_categories')
+    .insert({
       name: input.name,
       slug: input.slug,
       description: input.description,
-      iconUrl: input.iconUrl,
-      displayOrder: input.displayOrder ?? 0,
-      estimatedDurationHours: input.estimatedDurationHours
-        ? String(input.estimatedDurationHours)
-        : undefined,
-      basePrice: input.basePrice ? String(input.basePrice) : undefined,
-    },
-  })
+      icon_url: input.iconUrl,
+      display_order: input.displayOrder ?? 0,
+      estimated_duration_hours: input.estimatedDurationHours ?? null,
+      base_price: input.basePrice ?? null,
+    })
+    .select()
+    .single()
 
+  if (error) return { success: false, error: error.message, code: 'SERVER_ERROR' }
   return { success: true, category }
 }
 
 export async function updateCategory(slug: string, input: UpdateServiceCategoryInput) {
-  const existing = await prisma.serviceCategory.findUnique({ where: { slug } })
+  const { data: existing } = await supabase
+    .from('service_categories')
+    .select('id')
+    .eq('slug', slug)
+    .maybeSingle()
 
   if (!existing) {
     return { success: false, error: 'Category not found', code: 'NOT_FOUND' }
   }
 
-  const category = await prisma.serviceCategory.update({
-    where: { slug },
-    data: {
+  const { data: category, error } = await supabase
+    .from('service_categories')
+    .update({
       ...(input.name !== undefined && { name: input.name }),
       ...(input.description !== undefined && { description: input.description }),
-      ...(input.iconUrl !== undefined && { iconUrl: input.iconUrl }),
-      ...(input.displayOrder !== undefined && { displayOrder: input.displayOrder }),
-      ...(input.estimatedDurationHours !== undefined && {
-        estimatedDurationHours: String(input.estimatedDurationHours),
-      }),
-      ...(input.basePrice !== undefined && { basePrice: String(input.basePrice) }),
-    },
-  })
+      ...(input.iconUrl !== undefined && { icon_url: input.iconUrl }),
+      ...(input.displayOrder !== undefined && { display_order: input.displayOrder }),
+      ...(input.estimatedDurationHours !== undefined && { estimated_duration_hours: input.estimatedDurationHours }),
+      ...(input.basePrice !== undefined && { base_price: input.basePrice }),
+    })
+    .eq('slug', slug)
+    .select()
+    .single()
 
+  if (error) return { success: false, error: error.message, code: 'SERVER_ERROR' }
   return { success: true, category }
 }
 
 export async function toggleCategoryActive(slug: string) {
-  const existing = await prisma.serviceCategory.findUnique({ where: { slug } })
+  const { data: existing } = await supabase
+    .from('service_categories')
+    .select('id, is_active')
+    .eq('slug', slug)
+    .maybeSingle()
 
   if (!existing) {
     return { success: false, error: 'Category not found', code: 'NOT_FOUND' }
   }
 
-  const category = await prisma.serviceCategory.update({
-    where: { slug },
-    data: { isActive: !existing.isActive },
-  })
+  const { data: category, error } = await supabase
+    .from('service_categories')
+    .update({ is_active: !existing.is_active })
+    .eq('slug', slug)
+    .select()
+    .single()
 
+  if (error) return { success: false, error: error.message, code: 'SERVER_ERROR' }
   return { success: true, category }
 }

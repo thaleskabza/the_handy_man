@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { Suspense, useEffect, useState, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { apiFetch } from '@/lib/auth'
 
@@ -61,7 +61,7 @@ const STEPS = [
   'Confirm',
 ]
 
-export default function BookingPage() {
+function BookingContent() {
   const router = useRouter()
   const params = useSearchParams()
   const preselectedSlug = params.get('service') ?? ''
@@ -188,5 +188,17 @@ export default function BookingPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function BookingPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <BookingContent />
+    </Suspense>
   )
 }
