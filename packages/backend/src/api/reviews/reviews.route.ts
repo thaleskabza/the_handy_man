@@ -47,8 +47,8 @@ router.get('/professional/:id', async (c) => {
 
 // POST /reviews/:id/response — professional responds
 router.post('/:id/response', authenticate, requireRole('HANDYMAN'), validateRequest(professionalResponseSchema), async (c) => {
-  const userId = c.get('userId')
-  const reviewId = c.req.param('id')
+  const userId = c.get('userId') as string
+  const reviewId = c.req.param('id') as string
   const input = c.get('validated') as import('@handy-man/shared/validators').ProfessionalResponseInput
 
   const result = await addProfessionalResponse(reviewId, userId, input)

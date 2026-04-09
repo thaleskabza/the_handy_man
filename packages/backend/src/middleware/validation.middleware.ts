@@ -4,10 +4,13 @@
  */
 
 import type { Context, Next } from 'hono'
-import type { ZodSchema, ZodError } from 'zod'
 import { HTTP_STATUS } from '@handy-man/shared/constants'
 
-export function validateRequest<T>(schema: ZodSchema<T>) {
+type ZodIssue = { path: (string | number)[]; message: string }
+type ZodLikeError = { issues: ZodIssue[] }
+type ZodLikeSchema<T> = { parse(data: unknown): T }
+
+export function validateRequest<T>(schema: ZodLikeSchema<T>) {
   return async (c: Context, next: Next) => {
     try {
       const body = await c.req.json()
@@ -18,11 +21,11 @@ export function validateRequest<T>(schema: ZodSchema<T>) {
 
       await next()
     } catch (error) {
-      if ((error as ZodError).issues) {
-        const zodError = error as ZodError
+      if (error && typeof error === 'object' && 'issues' in error) {
+        const zodError = error as ZodLikeError
         const details: Record<string, string[]> = {}
 
-        zodError.issues.forEach((issue) => {
+        zodError.issues.forEach((issue: ZodIssue) => {
           const path = issue.path.join('.')
           if (!details[path]) {
             details[path] = []

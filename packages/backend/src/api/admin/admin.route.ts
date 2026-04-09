@@ -30,8 +30,8 @@ router.patch(
   '/applications/:id',
   validateRequest(reviewApplicationSchema),
   async (c) => {
-    const adminUserId = c.get('userId')
-    const applicationId = c.req.param('id')
+    const adminUserId = c.get('userId') as string
+    const applicationId = c.req.param('id') as string
     const input = c.get('validated') as ReviewApplicationInput
 
     const result = await reviewApplication(applicationId, adminUserId, input)
